@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  dairy-api:
+    build: .
+    container_name: smart-dairy-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg://dairy_admin:dairy_secret@dairy-postgres:5432/dairy_supply_chain
+    depends_on:
+      dairy-postgres:
+        condition: service_healthy
+    command: >
+      sh -c "python seed_database.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  dairy-postgres:
+    image: postgres:16-alpine
+    container_name: smart-dairy-postgres
+    environment:
+      POSTGRES_USER: dairy_admin
+      POSTGRES_PASSWORD: dairy_secret
+      POSTGRES_DB: dairy_supply_chain
+    ports:
+      - "5432:5432"
+    volumes:
+      - dairy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dairy_admin -d dairy_supply_chain"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dairy_pgdata:

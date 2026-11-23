@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KsheerOps — Tabler Cold-Chain &amp; Dispatch Console</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.4/dist/css/tabler.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --tblr-font-sans-serif: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --tblr-font-monospace: 'IBM Plex Mono', monospace;
+      --tblr-primary: #1b4332;
+      --tblr-primary-rgb: 27, 67, 50;
+    }
+    body {
+      font-family: var(--tblr-font-sans-serif);
+      background-color: #f4f6fa;
+    }
+    .mono {
+      font-family: var(--tblr-font-monospace);
+      font-variant-numeric: tabular-nums;
+    }
+    .scen-card {
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .scen-card:hover {
+      border-color: var(--tblr-primary);
+      transform: translateY(-1px);
+    }
+    .scen-card.selected {
+      border-color: var(--tblr-primary);
+      background-color: #f0f7f4;
+      box-shadow: inset 3px 0 0 var(--tblr-primary);
+    }
+    .chart-box {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+    .chart-box-sm {
+      position: relative;
+      height: 250px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Tabler Top Navbar -->
+    <header class="navbar navbar-expand-md navbar-dark bg-dark d-print-none sticky-top">
+      <div class="container-xl">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <a href="#overview" onclick="switchTab('overview'); return false;" class="navbar-brand navbar-brand-autodark pe-0 pe-md-3">
+          <span class="badge bg-warning text-dark me-2 mono">KO</span>
+          <span>KsheerOps</span>
+          <span class="badge bg-success-lt text-success ms-2 d-none d-sm-inline-block">Tabler UI</span>
+        </a>
+        <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
+          <span id="connBadge" class="badge bg-green-lt text-green d-none d-lg-inline-flex">Local Ledger (1,500)</span>
+          <span id="liveClock" class="badge bg-secondary-lt text-light mono">--:--:-- IST</span>
+          <button id="viewAllToggle" type="button" onclick="toggleViewAll()" class="btn btn-sm btn-outline-light">
+            Expand All
+          </button>
+        </div>
+        <div class="collapse navbar-collapse" id="navbar-menu">
+          <ul class="navbar-nav" id="primaryNav">
+            <li class="nav-item">
+              <a class="nav-link active" href="#overview" data-tab="overview" onclick="switchTab('overview'); return false;">
+                <span class="nav-link-title">Control Tower</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#iot" data-tab="iot" onclick="switchTab('iot'); return false;">
+                <span class="nav-link-title">IoT Telemetry</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#routing" data-tab="routing" onclick="switchTab('routing'); return false;">
+                <span class="nav-link-title">Route Optimizer</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#scenarios" data-tab="scenarios" onclick="switchTab('scenarios'); return false;">
+                <span class="nav-link-title">Disruption Drills</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#ml" data-tab="ml" onclick="switchTab('ml'); return false;">
+                <span class="nav-link-title">ML Quality &amp; Demand</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#database" data-tab="database" onclick="switchTab('database'); return false;">
+                <span class="nav-link-title">Batch Ledger</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-wrapper">
+      <!-- Page Header -->
+      <div class="page-header d-print-none py-3 border-bottom bg-white">
+        <div class="container-xl">
+          <div class="row g-2 align-items-center">
+            <div class="col">
+              <div class="page-pretitle text-muted">
+                Mother Dairy Gandhinagar &bull; <span id="breadcrumbCurrent">Control Tower</span> &bull; NDDB Ceiling &le; 4.5&deg;C
+              </div>
+              <h2 id="pageTitle" class="page-title mb-0">Procurement &amp; Cold-Chain Summary</h2>
+            </div>
+            <div class="col-auto ms-auto d-none d-md-flex align-items-center gap-2">
+              <span class="badge bg-azure-lt text-azure">5 BMC Hubs</span>
+              <span class="badge bg-indigo-lt text-indigo">18 Reefer Tankers</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Drill Banner -->
+      <div id="scenarioBanner" class="d-none bg-warning-lt border-bottom border-warning py-2">
+        <div class="container-xl d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div class="d-flex align-items-center gap-2 small fw-semibold text-warning-emphasis">
+            <span class="badge bg-warning text-dark mono">DRILL ACTIVE</span>
+            <span id="scenarioBannerText">Active Disruption Drill</span>
+          </div>
+          <button type="button" onclick="resetScenario()" class="btn btn-sm btn-warning">End Drill &amp; Restore Baseline</button>
+        </div>
+      </div>
+
+      <!-- Main Page Body -->
+      <div class="page-body py-4">
+        <div class="container-xl">
+
+          <!-- TAB 01: OVERVIEW -->
+          <section id="tab-overview" class="tab-panel">
+            <div class="row row-deck row-cards mb-3">
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Total Raw Milk Collected</div>
+                    <div id="kpiVolume" class="h1 mt-1 mb-1 mono">--</div>
+                    <div id="kpiVolumeSub" class="text-secondary small">Across 1,500 tanker batches</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Mean Reefer Chamber Temp</div>
+                    <div id="kpiTemp" class="h1 mt-1 mb-1 mono">--</div>
+                    <div class="text-secondary small">Compliance band: 2.0&deg;C &ndash; 4.5&deg;C</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Thermal Spoilage Alerts</div>
+                    <div id="kpiSpoilage" class="h1 mt-1 mb-1 mono text-danger">--</div>
+                    <div class="text-secondary small">Flagged via pH &amp; MBRT thresholds</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Route Distance Saved</div>
+                    <div id="kpiSavedKm" class="h1 mt-1 mb-1 mono text-success">--</div>
+                    <div id="kpiCo2Sub" class="text-secondary small">Diesel &amp; CO&#8322; reduction</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mb-3">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Regional Bulk Milk Cooler (BMC) Hubs</h3>
+                  <div class="card-subtitle">Chilling performance and batch volume by district collection center</div>
+                </div>
+                <div class="card-actions">
+                  <span class="badge bg-secondary-lt mono">5 Active Centers</span>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="hubCardsGrid" class="row row-cards"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Inbound Milk Volume vs. Next-Day Plant Demand</h3>
+                  <div class="card-subtitle">Latest 24 tanker dispatches compared against regional demand projections</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="chart-box"><canvas id="overviewChart"></canvas></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 02: LIVE IOT TELEMETRY -->
+          <section id="tab-iot" class="tab-panel d-none">
+            <div class="card mb-3">
+              <div class="card-header flex-wrap gap-2">
+                <div>
+                  <h3 class="card-title">Edge Gateway Reefer Telemetry (2s Polling)</h3>
+                  <div class="card-subtitle">Live chamber temperature, door latch state, and compressor RPM across highway tankers</div>
+                </div>
+                <div class="card-actions d-flex flex-wrap gap-2">
+                  <button id="iotToggleBtn" type="button" onclick="toggleIoTStream()" class="btn btn-sm btn-outline-secondary">Pause Stream</button>
+                  <button type="button" onclick="injectIoTBreach()" class="btn btn-sm btn-outline-danger">Simulate TKR-03 Breach (&gt;4.5&deg;C)</button>
+                  <button type="button" onclick="resetIoTStream()" class="btn btn-sm btn-primary">Reset IoT Stream</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="tankerCardsGrid" class="row row-cards"></div>
+              </div>
+            </div>
+
+            <div class="row row-cards">
+              <div class="col-lg-8">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <div>
+                      <h3 class="card-title">Chamber Temperature Trend (&deg;C)</h3>
+                      <div class="card-subtitle">Comparing Anand (TKR-01) and Mehsana (TKR-03) against NDDB ceiling</div>
+                    </div>
+                    <div class="card-actions">
+                      <span class="badge bg-danger-lt text-danger mono">Limit: 4.5&deg;C</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="chart-box-sm"><canvas id="iotChart"></canvas></div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-4">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <div>
+                      <h3 class="card-title">Gateway Event Log</h3>
+                      <div class="card-subtitle">Hottest reading per 2-second packet</div>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div id="iotAlertLog" class="overflow-auto d-flex flex-column gap-2 mono small" style="max-height: 250px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 03: ROUTE OPTIMIZER -->
+          <section id="tab-routing" class="tab-panel d-none">
+            <div class="row row-cards mb-3">
+              <div class="col-md-4">
+                <div class="card border-start border-danger border-3">
+                  <div class="card-body">
+                    <div class="text-danger fw-bold small text-uppercase">Priority 01 &bull; Thermal Urgency</div>
+                    <div class="text-secondary small mt-1">Hubs reporting milk above <strong>4.5&deg;C</strong> are dispatched first to prevent microbial growth during transit.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-start border-primary border-3">
+                  <div class="card-body">
+                    <div class="text-primary fw-bold small text-uppercase">Priority 02 &bull; Nearest Leg</div>
+                    <div class="text-secondary small mt-1">From the tanker&rsquo;s current hub, select the closest eligible collection center on the Gujarat highway matrix.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-start border-warning border-3">
+                  <div class="card-body">
+                    <div class="text-warning fw-bold small text-uppercase">Priority 03 &bull; Payload Cap</div>
+                    <div class="text-secondary small mt-1">When the next stop exceeds tanker volume capacity, return to Gandhinagar depot and assign a fresh tanker.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row row-cards mb-3">
+              <div class="col-lg-4">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <h3 class="card-title">Fleet &amp; Hub Parameters</h3>
+                    <div class="card-actions">
+                      <button type="button" onclick="solveSimpleRoutes()" class="btn btn-sm btn-primary">Recalculate</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="mb-3">
+                      <div class="d-flex justify-content-between small fw-semibold mb-1">
+                        <label for="tankerCapSlider">Tanker Max Payload</label>
+                        <span id="capValLabel" class="mono text-primary">15,000 L</span>
+                      </div>
+                      <input id="tankerCapSlider" type="range" class="form-range" min="10000" max="20000" step="1000" value="15000" oninput="document.getElementById('capValLabel').textContent = Number(this.value).toLocaleString() + ' L'; solveSimpleRoutes();">
+                    </div>
+                    <div class="form-check mb-3">
+                      <input id="warmPriorityToggle" class="form-check-input" type="checkbox" checked onchange="solveSimpleRoutes()">
+                      <label class="form-check-label small fw-medium" for="warmPriorityToggle">
+                        Enforce Warm Milk Priority (&gt; 4.5&deg;C)
+                      </label>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-vcenter mb-0">
+                        <thead>
+                          <tr>
+                            <th>BMC Hub</th>
+                            <th>Load (L)</th>
+                            <th>Temp (&deg;C)</th>
+                          </tr>
+                        </thead>
+                        <tbody id="routeInputsBody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-lg-8">
+                <div class="card h-100">
+                  <div class="card-header flex-wrap gap-2">
+                    <div>
+                      <h3 class="card-title">North &amp; Central Gujarat Corridor Schematic</h3>
+                      <div class="card-subtitle">Comparing static alphabetical loop vs. thermal-aware dispatch</div>
+                    </div>
+                    <div class="card-actions d-flex align-items-center gap-3 small text-secondary">
+                      <span><span class="d-inline-block border-top border-2 border-danger align-middle me-1" style="width:16px;border-style:dashed!important;"></span>Fixed Order</span>
+                      <span><span class="d-inline-block bg-success rounded align-middle me-1" style="width:16px;height:3px;"></span>Optimized Route</span>
+                    </div>
+                  </div>
+                  <div class="card-body d-flex align-items-center">
+                    <svg id="routeSvgMap" viewBox="0 0 640 330" class="w-100 rounded border bg-dark" style="height:290px;"></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row row-cards">
+              <div class="col-lg-4">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <h3 class="card-title">Savings Summary</h3>
+                  </div>
+                  <div class="list-group list-group-flush small">
+                    <div class="list-group-item d-flex justify-content-between">
+                      <span class="text-secondary">Fixed Alphabetical Route</span>
+                      <span id="rtBaseKm" class="fw-semibold mono text-danger">--</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between">
+                      <span class="text-secondary">Optimized 3-Rule Route</span>
+                      <span id="rtOptKm" class="fw-semibold mono text-success">--</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between">
+                      <span class="text-secondary">Net Distance Saved</span>
+                      <span id="rtSavedKm" class="fw-bold mono">--</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between">
+                      <span class="text-secondary">Fuel &amp; Carbon Offset</span>
+                      <span id="rtEcoSaved" class="fw-semibold mono text-secondary">--</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-8">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <h3 class="card-title">Tanker Dispatch Manifest</h3>
+                  </div>
+                  <div class="card-body">
+                    <div id="routeStepLog" class="overflow-auto small d-flex flex-column gap-1" style="max-height:220px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 04: DISRUPTION DRILLS -->
+          <section id="tab-scenarios" class="tab-panel d-none">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+              <div>
+                <h3 class="mb-0">Operational Disruption Drills</h3>
+                <div class="text-secondary small">Select a field disruption to test plant KPI sensitivity and automated dispatch directives</div>
+              </div>
+              <button type="button" onclick="resetScenario()" class="btn btn-sm btn-outline-secondary">Restore Normal Baseline</button>
+            </div>
+
+            <div class="row row-cards mb-3">
+              <div class="col-sm-6 col-lg-4">
+                <div id="scen-btn-thermal_breach" onclick="runScenario('thermal_breach')" class="card scen-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between small mono text-danger fw-bold">
+                      <span>DRILL 01</span><span>COLD-CHAIN</span>
+                    </div>
+                    <div class="fw-bold mt-1">Reefer Compressor Failure</div>
+                    <div class="text-secondary small mt-1">TKR-03 chamber climbs to 6.4&deg;C on Mehsana route; triggers immediate priority reroute.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-4">
+                <div id="scen-btn-summer_heatwave" onclick="runScenario('summer_heatwave')" class="card scen-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between small mono text-warning fw-bold">
+                      <span>DRILL 02</span><span>SEASONAL</span>
+                    </div>
+                    <div class="fw-bold mt-1">43&deg;C North Gujarat Heatwave</div>
+                    <div class="text-secondary small mt-1">Ambient heat rises +9&deg;C while lean-season consumer demand increases +22%.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-4">
+                <div id="scen-btn-highway_congestion" onclick="runScenario('highway_congestion')" class="card scen-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between small mono text-primary fw-bold">
+                      <span>DRILL 03</span><span>TRANSIT</span>
+                    </div>
+                    <div class="fw-bold mt-1">NH-48 Freight Bottleneck</div>
+                    <div class="text-secondary small mt-1">Transit duration increases +1.6 hrs on Anand&ndash;Kheda corridor; stops re-sequenced.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-4">
+                <div id="scen-btn-monsoon_flood" onclick="runScenario('monsoon_flood')" class="card scen-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between small mono text-secondary fw-bold">
+                      <span>DRILL 04</span><span>WEATHER</span>
+                    </div>
+                    <div class="fw-bold mt-1">Monsoon Feeder Detour</div>
+                    <div class="text-secondary small mt-1">Waterlogged rural roads add +38 km in Sabarkantha; partial loads consolidated.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-4">
+                <div id="scen-btn-winter_flush" onclick="runScenario('winter_flush')" class="card scen-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between small mono text-success fw-bold">
+                      <span>DRILL 05</span><span>SURPLUS</span>
+                    </div>
+                    <div class="fw-bold mt-1">Winter Flush Milk Surge (+25%)</div>
+                    <div class="text-secondary small mt-1">Peak buffalo milk procurement (+25% volume); standby tankers mobilized.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-4">
+                <div id="scen-btn-cascade_failure" onclick="runScenario('cascade_failure')" class="card scen-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between small mono text-danger fw-bold">
+                      <span>DRILL 06</span><span>COMPOUND</span>
+                    </div>
+                    <div class="fw-bold mt-1">Multi-Hub Chiller Outage</div>
+                    <div class="text-secondary small mt-1">Simultaneous Banaskantha chiller drop and weekend retail demand spike.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row row-cards">
+              <div class="col-lg-4">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <h3 id="scenTitle" class="card-title">Baseline Normal Operations</h3>
+                  </div>
+                  <div class="card-body small d-flex flex-column justify-content-between gap-3">
+                    <div>
+                      <p id="scenDesc" class="text-secondary mb-2">Choose any operational drill above to inspect KPI shifts and recommended control-room actions.</p>
+                      <div id="scenDeltas" class="border-top pt-2"></div>
+                    </div>
+                    <div id="scenDirective" class="alert alert-success mb-0 py-2">
+                      Control Directive: All 5 BMC hubs operating within NDDB &le;4.5&deg;C compliance.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-8">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <h3 class="card-title">Baseline vs. Drill Impact Comparison</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="chart-box-sm"><canvas id="scenarioChart"></canvas></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 05: ML LAB -->
+          <section id="tab-ml" class="tab-panel d-none">
+            <div class="row row-deck row-cards mb-3">
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Spoilage Classifier Acc.</div>
+                    <div class="h1 mt-1 mb-1 mono">98.67%</div>
+                    <div class="text-secondary small">Random Forest (F1: 0.9841)</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">ROC-AUC Score</div>
+                    <div class="h1 mt-1 mb-1 mono text-primary">0.9982</div>
+                    <div class="text-secondary small">Logistic Baseline: 0.9960</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Demand Model R&sup2;</div>
+                    <div class="h1 mt-1 mb-1 mono">0.9552</div>
+                    <div class="text-secondary small">Gradient Boosting Regressor</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="subheader">Forecast Mean Error</div>
+                    <div class="h1 mt-1 mb-1 mono text-warning">269.7 L</div>
+                    <div class="text-secondary small">~3.1% MAE across 8,509 L avg</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row row-cards">
+              <div class="col-lg-6">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <div>
+                      <h3 class="card-title">Batch Spoilage &amp; Demand Estimator</h3>
+                      <div class="card-subtitle">Adjust transit telemetry sliders to compute milk chemistry and risk</div>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-3 small mb-3">
+                      <div class="col-sm-6">
+                        <div class="d-flex justify-content-between fw-semibold mb-1">
+                          <label for="mlTemp">Reefer Chamber Temp</label>
+                          <span id="mlTempLbl" class="mono text-primary">4.2&deg;C</span>
+                        </div>
+                        <input id="mlTemp" type="range" class="form-range" min="2.0" max="9.5" step="0.1" value="4.2" oninput="runMLInference()">
+                      </div>
+                      <div class="col-sm-6">
+                        <div class="d-flex justify-content-between fw-semibold mb-1">
+                          <label for="mlHrs">Transit Duration</label>
+                          <span id="mlHrsLbl" class="mono text-primary">2.8 hrs</span>
+                        </div>
+                        <input id="mlHrs" type="range" class="form-range" min="0.5" max="7.0" step="0.1" value="2.8" oninput="runMLInference()">
+                      </div>
+                      <div class="col-sm-6">
+                        <div class="d-flex justify-content-between fw-semibold mb-1">
+                          <label for="mlExc">Thermal Excursion</label>
+                          <span id="mlExcLbl" class="mono text-primary">18 mins</span>
+                        </div>
+                        <input id="mlExc" type="range" class="form-range" min="0" max="150" step="5" value="18" oninput="runMLInference()">
+                      </div>
+                      <div class="col-sm-6">
+                        <div class="d-flex justify-content-between fw-semibold mb-1">
+                          <label for="mlVol">Raw Milk Volume</label>
+                          <span id="mlVolLbl" class="mono text-primary">5,800 L</span>
+                        </div>
+                        <input id="mlVol" type="range" class="form-range" min="2000" max="9500" step="100" value="5800" oninput="runMLInference()">
+                      </div>
+                    </div>
+
+                    <div class="p-3 rounded bg-dark text-white">
+                      <div class="d-flex justify-content-between align-items-center small">
+                        <span class="text-secondary">Estimated Spoilage Probability</span>
+                        <span id="mlRiskBadge" class="badge bg-success mono">SAFE COLD-CHAIN</span>
+                      </div>
+                      <div class="d-flex justify-content-between align-items-baseline mt-2">
+                        <span id="mlProbVal" class="h1 mb-0 mono text-white">11.4%</span>
+                        <span id="mlChemVal" class="small mono text-light">Est. pH: 6.66 | MBRT: 4.8 hrs</span>
+                      </div>
+                      <div class="border-top border-secondary mt-3 pt-2 d-flex justify-content-between small">
+                        <span class="text-secondary">Projected Next-Day Hub Demand</span>
+                        <span id="mlDemandVal" class="fw-bold text-warning mono">8,420 L</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-lg-6">
+                <div class="card h-100">
+                  <div class="card-header">
+                    <div>
+                      <h3 class="card-title">Model Feature Weights (Random Forest)</h3>
+                      <div class="card-subtitle">Relative predictive contribution across 1,500 training batches</div>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="chart-box-sm"><canvas id="mlFeatChart"></canvas></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 06: BATCH LEDGER -->
+          <section id="tab-database" class="tab-panel d-none">
+            <div class="card">
+              <div class="card-header flex-wrap gap-2">
+                <div>
+                  <h3 class="card-title">Relational Milk Batch Ledger</h3>
+                  <div id="dbCountSubtitle" class="card-subtitle">Showing 1,500 deterministic records</div>
+                </div>
+                <div class="card-actions d-flex gap-2">
+                  <button type="button" onclick="openAddModal()" class="btn btn-sm btn-primary">+ Log New Batch</button>
+                  <button type="button" onclick="exportCSV()" class="btn btn-sm btn-outline-secondary">Export CSV</button>
+                </div>
+              </div>
+
+              <div class="card-body border-bottom bg-light py-2">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <input id="dbSearch" type="text" class="form-control form-control-sm" placeholder="Filter by Batch ID, Tanker, Corridor..." oninput="dbPage=1; renderDbTable();">
+                  </div>
+                  <div class="col-md-3">
+                    <select id="dbBmcFilter" class="form-select form-select-sm" onchange="dbPage=1; renderDbTable();">
+                      <option value="">All 5 BMC Hubs</option>
+                      <option value="BMC-Anand-North">BMC-Anand-North</option>
+                      <option value="BMC-Mehsana-East">BMC-Mehsana-East</option>
+                      <option value="BMC-Banaskantha-West">BMC-Banaskantha-West</option>
+                      <option value="BMC-Sabarkantha-Central">BMC-Sabarkantha-Central</option>
+                      <option value="BMC-Kheda-South">BMC-Kheda-South</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <select id="dbRiskFilter" class="form-select form-select-sm" onchange="dbPage=1; renderDbTable();">
+                      <option value="">All Quality States</option>
+                      <option value="0">Safe Cold-Chain (0)</option>
+                      <option value="1">Spoilage Risk (1)</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <select id="dbPageSize" class="form-select form-select-sm" onchange="dbPage=1; renderDbTable();">
+                      <option value="25">25 rows</option>
+                      <option value="50">50 rows</option>
+                      <option value="100">100 rows</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-vcenter table-striped card-table small mb-0">
+                  <thead>
+                    <tr>
+                      <th>Batch ID</th>
+                      <th>Timestamp</th>
+                      <th>BMC Hub</th>
+                      <th>Tanker</th>
+                      <th>Volume (L)</th>
+                      <th>Reefer (&deg;C)</th>
+                      <th>pH / MBRT</th>
+                      <th>Saved (km)</th>
+                      <th>Next Demand</th>
+                      <th>Quality</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dbTableBody"></tbody>
+                </table>
+              </div>
+
+              <div class="card-footer d-flex align-items-center justify-content-between small">
+                <span id="dbPageInfo" class="text-secondary">Page 1</span>
+                <div class="d-flex gap-2">
+                  <button type="button" onclick="changeDbPage(-1)" class="btn btn-sm btn-outline-secondary">Previous</button>
+                  <button type="button" onclick="changeDbPage(1)" class="btn btn-sm btn-outline-secondary">Next</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <footer class="footer footer-transparent d-print-none py-3">
+        <div class="container-xl d-flex flex-wrap justify-content-between small text-secondary">
+          <span>KsheerOps Cold-Chain DSS &bull; Built with Tabler UI Kit</span>
+          <span>Gujarat Milk Procurement Grid</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Tabler Modal for Logging New Batch -->
+  <div class="modal modal-blur fade" id="addModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Log New Tanker Milk Batch</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3 small">
+            <div class="col-6">
+              <label class="form-label" for="newBmc">BMC Collection Center</label>
+              <select id="newBmc" class="form-select">
+                <option>BMC-Anand-North</option>
+                <option>BMC-Mehsana-East</option>
+                <option>BMC-Banaskantha-West</option>
+                <option>BMC-Sabarkantha-Central</option>
+                <option>BMC-Kheda-South</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="newTanker">Tanker ID</label>
+              <input id="newTanker" value="TKR-01" class="form-control mono">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="newVol">Volume (Liters)</label>
+              <input id="newVol" type="number" value="6200" class="form-control mono">
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="newTemp">Reefer Temp (&deg;C)</label>
+              <input id="newTemp" type="number" step="0.1" value="3.4" class="form-control mono">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" onclick="saveNewBatch()" class="btn btn-primary">Append Record</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.7.4/dist/js/tabler.min.js"></script>
+  <script>
+    function updateClock() {
+      const el = document.getElementById('liveClock');
+      if (el) el.textContent = new Date().toTimeString().slice(0, 8) + ' IST';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+    Chart.defaults.color = '#626976';
+
+    function mulberry32(seed) {
+      return function() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    const rng = mulberry32(42);
+    function randNorm(mean, std) {
+      const u1 = Math.max(1e-7, rng()), u2 = rng();
+      return mean + std * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+
+    const BMCS = [
+      { code: "BMC-Anand-North", name: "Anand North", dist: 28, scale: 1.15 },
+      { code: "BMC-Mehsana-East", name: "Mehsana East", dist: 52, scale: 1.25 },
+      { code: "BMC-Banaskantha-West", name: "Banaskantha West", dist: 118, scale: 1.35 },
+      { code: "BMC-Sabarkantha-Central", name: "Sabarkantha Central", dist: 76, scale: 1.05 },
+      { code: "BMC-Kheda-South", name: "Kheda South", dist: 34, scale: 0.95 }
+    ];
+    const CORRIDORS = ["CORR-A1-Express", "CORR-B2-Rural", "CORR-C3-Highway", "CORR-D4-Feeder"];
+    let dbRecords = [];
+    let activeModifiers = { tempDelta: 0, volMult: 1, demandMult: 1, savedKmMult: 1 };
+
+    function buildSeedDataset() {
+      const startMs = Date.UTC(2025, 0, 1, 5, 0);
+      for (let i = 0; i < 1500; i++) {
+        const dt = new Date(startMs + i * 12 * 3600 * 1000);
+        const dow = dt.getUTCDay(), m = dt.getUTCMonth() + 1;
+        let season = 3, amb = randNorm(29.5, 2.8), sSup = 1.02, sDem = 0.98;
+        if ([11, 12, 1, 2].includes(m)) { season = 1; amb = randNorm(22.5, 3.2); sSup = 1.18; sDem = 1.05; }
+        else if ([3, 4, 5, 6].includes(m)) { season = 2; amb = randNorm(38.5, 3.8); sSup = 0.84; sDem = 1.22; }
+        const bIdx = i % 5, bmc = BMCS[bIdx], tanker = `TKR-${String((i % 18) + 1).padStart(2, '0')}`;
+        const rawVol = Math.max(1400, Math.min(9600, randNorm(4800 * bmc.scale * sSup, 680)));
+        const fat = +(Math.max(3.2, Math.min(6.9, randNorm(season === 1 ? 4.8 : 4.3, 0.55)))).toFixed(2);
+        const snf = +(Math.max(8.0, Math.min(9.5, randNorm(8.65, 0.28)))).toFixed(2);
+        const initT = +(Math.max(2.0, Math.min(5.2, randNorm(3.1, 0.55)))).toFixed(2);
+        const distKm = +(Math.max(12, Math.min(175, randNorm(bmc.dist, bmc.dist * 0.18)))).toFixed(1);
+        const transitHrs = +(distKm * (0.022 + rng() * 0.02) + 0.25 + rng() * 0.65).toFixed(2);
+        const doors = Math.floor(rng() * 5), fault = rng() < 0.14 ? (1.6 + rng() * 2.0) : 0;
+        const reeferT = +(Math.max(2.0, Math.min(10.5, initT + (amb - 20) * 0.045 + doors * 0.42 + transitHrs * 0.28 + fault))).toFixed(2);
+        const excMins = Math.max(0, Math.round((reeferT - 4.3) * transitHrs * 14.5));
+        const tLoad = Math.max(0, reeferT - 3.8) * Math.pow(transitHrs, 1.15) + excMins / 45;
+        const ph = +(Math.max(6.2, Math.min(6.84, 6.72 - 0.024 * tLoad))).toFixed(2);
+        const mbrt = +(Math.max(0.8, Math.min(6.5, 5.6 - 0.34 * tLoad))).toFixed(2);
+        const risk = (reeferT > 4.65 || ph < 6.53) ? 1 : 0;
+        const savedKm = +(distKm * (0.08 + rng() * 0.11)).toFixed(1);
+        const nextDem = +(rawVol * 1.18 * (sDem / sSup) + bmc.scale * 950).toFixed(1);
+        dbRecords.push({
+          Batch_ID: `BATCH-${10001 + i}`,
+          Timestamp: dt.toISOString().slice(0, 16).replace('T', ' '),
+          Collection_Center_BMC: bmc.code,
+          Route_Corridor: CORRIDORS[bIdx % 4],
+          Tanker_ID: tanker,
+          Day_Of_Week: dow,
+          Season_Index: season,
+          Raw_Milk_Volume_Liters: +rawVol.toFixed(1),
+          Fat_Content_Pct: fat,
+          SNF_Content_Pct: snf,
+          Initial_Chilling_Temp_C: initT,
+          Reefer_Chamber_Temp_C: reeferT,
+          Ambient_External_Temp_C: +amb.toFixed(1),
+          Transit_Distance_Km: distKm,
+          Transit_Duration_Hrs: transitHrs,
+          Reefer_Door_Open_Count: doors,
+          Thermal_Excursion_Mins: excMins,
+          Milk_pH_Level: ph,
+          MBRT_Hours: mbrt,
+          Optimal_Route_Saved_Km: savedKm,
+          Cold_Chain_Spoilage_Risk: risk,
+          Next_Day_Demand_Liters: nextDem
+        });
+      }
+    }
+
+    const TAB_META = {
+      overview: { crumb: 'Control Tower', title: 'Procurement & Cold-Chain Summary' },
+      iot: { crumb: 'IoT Telemetry', title: 'Live Cold-Chain IoT Telemetry Monitor' },
+      routing: { crumb: 'Route Optimizer', title: 'Milk Collection Route Optimizer (3-Rule Engine)' },
+      scenarios: { crumb: 'Disruption Drills', title: 'Supply Chain Disruption & Contingency Drills' },
+      ml: { crumb: 'ML Quality & Demand', title: 'Spoilage Risk & Regional Demand Inference Lab' },
+      database: { crumb: 'Batch Ledger', title: 'Relational Milk Batch Ledger (1,500 Records)' }
+    };
+
+    let viewAllMode = false;
+    function switchTab(tabId) {
+      viewAllMode = false;
+      const tBtn = document.getElementById('viewAllToggle');
+      if (tBtn) tBtn.textContent = 'Expand All';
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('d-none'));
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.remove('d-none');
+      document.querySelectorAll('#primaryNav .nav-link').forEach(a => a.classList.toggle('active', a.dataset.tab === tabId));
+      if (TAB_META[tabId]) {
+        document.getElementById('breadcrumbCurrent').textContent = TAB_META[tabId].crumb;
+        document.getElementById('pageTitle').textContent = TAB_META[tabId].title;
+      }
+      const navCollapse = document.getElementById('navbar-menu');
+      if (navCollapse && navCollapse.classList.contains('show') && window.tabler && window.tabler.Collapse) {
+        const inst = window.tabler.Collapse.getInstance(navCollapse) || new window.tabler.Collapse(navCollapse, { toggle: false });
+        inst.hide();
+      }
+    }
+
+    function toggleViewAll() {
+      viewAllMode = !viewAllMode;
+      const tBtn = document.getElementById('viewAllToggle');
+      if (tBtn) tBtn.textContent = viewAllMode ? 'Tabbed View' : 'Expand All';
+      if (viewAllMode) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('d-none'));
+        document.querySelectorAll('#primaryNav .nav-link').forEach(a => a.classList.remove('active'));
+        document.getElementById('breadcrumbCurrent').textContent = 'Full Report';
+        document.getElementById('pageTitle').textContent = 'Complete Supply Chain Control Tower';
+      } else {
+        switchTab('overview');
+      }
+    }
+
+    let overviewChart = null;
+    function refreshOverview() {
+      let totVol = 0, sumTemp = 0, riskCnt = 0, sumSaved = 0;
+      const hubStats = {};
+      BMCS.forEach(b => hubStats[b.code] = { name: b.name, vol: 0, tempSum: 0, cnt: 0, risk: 0 });
+      dbRecords.forEach(r => {
+        const v = r.Raw_Milk_Volume_Liters * activeModifiers.volMult;
+        const t = r.Reefer_Chamber_Temp_C + activeModifiers.tempDelta;
+        const isRisk = (t > 4.65 || r.Cold_Chain_Spoilage_Risk === 1) ? 1 : 0;
+        totVol += v; sumTemp += t; riskCnt += isRisk; sumSaved += r.Optimal_Route_Saved_Km * activeModifiers.savedKmMult;
+        if (hubStats[r.Collection_Center_BMC]) {
+          hubStats[r.Collection_Center_BMC].vol += v;
+          hubStats[r.Collection_Center_BMC].tempSum += t;
+          hubStats[r.Collection_Center_BMC].cnt += 1;
+          hubStats[r.Collection_Center_BMC].risk += isRisk;
+        }
+      });
+      const avgTemp = sumTemp / dbRecords.length;
+      const riskPct = (riskCnt / dbRecords.length) * 100;
+      const fuelSaved = sumSaved / 3.5;
+      const co2Saved = fuelSaved * 2.68;
+
+      document.getElementById('kpiVolume').textContent = `${(totVol / 1e6).toFixed(2)}M L`;
+      document.getElementById('kpiVolumeSub').textContent = `${Math.round(totVol).toLocaleString()} L across ${dbRecords.length.toLocaleString()} batches`;
+      document.getElementById('kpiTemp').textContent = `${avgTemp.toFixed(2)}°C`;
+      document.getElementById('kpiSpoilage').textContent = `${riskCnt} (${riskPct.toFixed(1)}%)`;
+      document.getElementById('kpiSavedKm').textContent = `${Math.round(sumSaved).toLocaleString()} km`;
+      document.getElementById('kpiCo2Sub').textContent = `${Math.round(fuelSaved).toLocaleString()} L diesel | ${Math.round(co2Saved).toLocaleString()} kg CO₂ saved`;
+
+      document.getElementById('hubCardsGrid').innerHTML = Object.entries(hubStats).map(([, st]) => {
+        const hTemp = st.tempSum / Math.max(1, st.cnt);
+        const alert = hTemp > 4.6;
+        return `
+          <div class="col-sm-6 col-md-4 col-lg">
+            <div class="card card-sm ${alert ? 'border-danger bg-danger-lt' : ''}">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="fw-bold small">${st.name}</span>
+                  <span class="badge ${alert ? 'bg-danger' : 'bg-success-lt text-success'} mono">${hTemp.toFixed(1)}°C</span>
+                </div>
+                <div class="h2 mt-2 mb-1 mono">${(st.vol / 1000).toFixed(0)}k L</div>
+                <div class="text-secondary small">${st.cnt} batches &bull; ${st.risk} alerts</div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      const slice = dbRecords.slice(0, 24);
+      if (overviewChart) overviewChart.destroy();
+      overviewChart = new Chart(document.getElementById('overviewChart'), {
+        type: 'line',
+        data: {
+          labels: slice.map(r => r.Batch_ID.replace('BATCH-', '#')),
+          datasets: [
+            {
+              label: 'Raw Milk Collected (L)',
+              data: slice.map(r => Math.round(r.Raw_Milk_Volume_Liters * activeModifiers.volMult)),
+              borderColor: '#1b4332',
+              backgroundColor: 'rgba(27, 67, 50, 0.08)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.3
+            },
+            {
+              label: 'Forecasted Next-Day Demand (L)',
+              data: slice.map(r => Math.round(r.Next_Day_Demand_Liters * activeModifiers.demandMult)),
+              borderColor: '#d97706',
+              borderWidth: 2,
+              borderDash: [5, 4],
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', align: 'end' } },
+          scales: { x: { grid: { display: false } }, y: { grid: { color: '#eef1f5' } } }
+        }
+      });
+    }
+
+    let iotRunning = true, iotChart = null, breachInjected = false;
+    const iotFleet = [
+      { id: 'TKR-01', hub: 'Anand North', baseTemp: 3.2, temp: 3.2, door: 'CLOSED', rpm: 2380 },
+      { id: 'TKR-03', hub: 'Mehsana East', baseTemp: 3.55, temp: 3.55, door: 'CLOSED', rpm: 2420 },
+      { id: 'TKR-07', hub: 'Banaskantha West', baseTemp: 3.45, temp: 3.45, door: 'CLOSED', rpm: 2450 },
+      { id: 'TKR-12', hub: 'Sabarkantha Central', baseTemp: 3.65, temp: 3.65, door: 'CLOSED', rpm: 2410 },
+      { id: 'TKR-15', hub: 'Kheda South', baseTemp: 3.15, temp: 3.15, door: 'CLOSED', rpm: 2320 }
+    ];
+    const iotHistory = { labels: [], tkr01: [], tkr03: [], limit: [] };
+
+    function initIoTChart() {
+      iotChart = new Chart(document.getElementById('iotChart'), {
+        type: 'line',
+        data: {
+          labels: iotHistory.labels,
+          datasets: [
+            { label: 'TKR-01 (Anand)', data: iotHistory.tkr01, borderColor: '#1b4332', borderWidth: 2, tension: 0.25 },
+            { label: 'TKR-03 (Mehsana)', data: iotHistory.tkr03, borderColor: '#d97706', borderWidth: 2, tension: 0.25 },
+            { label: 'NDDB Limit (4.5°C)', data: iotHistory.limit, borderColor: '#d63939', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: { legend: { position: 'top', align: 'end' } },
+          scales: { x: { grid: { display: false } }, y: { min: 2.0, max: 7.5, grid: { color: '#eef1f5' } } }
+        }
+      });
+    }
+
+    function stepIoT(forceRender = false) {
+      if (!iotRunning && !forceRender) return;
+      const now = new Date().toTimeString().slice(0, 8);
+      iotFleet.forEach((t, idx) => {
+        if (breachInjected && idx === 1) {
+          t.temp = +(Math.max(5.65, Math.min(6.45, t.temp + (Math.random() - 0.45) * 0.16))).toFixed(2);
+          t.door = 'OPEN';
+          t.rpm = 3150;
+        } else if (activeModifiers.tempDelta > 0) {
+          t.temp = +(Math.max(2.4, Math.min(7.2, t.temp + (Math.random() - 0.5) * 0.18 + activeModifiers.tempDelta * 0.08))).toFixed(2);
+          t.door = t.temp > 5.3 ? 'OPEN' : 'CLOSED';
+          t.rpm = t.temp > 4.5 ? 3150 : 2380;
+        } else {
+          const pullToBaseline = (t.baseTemp - t.temp) * 0.35;
+          const jitter = (Math.random() - 0.5) * 0.16;
+          t.temp = +(Math.max(2.4, Math.min(4.15, t.temp + pullToBaseline + jitter))).toFixed(2);
+          t.door = 'CLOSED';
+          t.rpm = 2380;
+        }
+      });
+
+      document.getElementById('tankerCardsGrid').innerHTML = iotFleet.map(t => {
+        const breach = t.temp > 4.5;
+        return `
+          <div class="col-sm-6 col-md-4 col-lg">
+            <div class="card card-sm ${breach ? 'border-danger bg-danger-lt' : ''}">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="fw-bold small mono">${t.id}</span>
+                  <span class="badge ${breach ? 'bg-danger' : 'bg-success-lt text-success'} mono">${breach ? 'BREACH' : 'NORMAL'}</span>
+                </div>
+                <div class="h2 mt-2 mb-1 mono ${breach ? 'text-danger' : ''}">${t.temp.toFixed(2)}°C</div>
+                <div class="text-secondary small">${t.hub} &bull; Door: <strong class="${t.door === 'OPEN' ? 'text-danger' : ''}">${t.door}</strong></div>
+                <div class="text-muted small mono">Compressor: ${t.rpm} RPM</div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      iotHistory.labels.push(now);
+      iotHistory.tkr01.push(iotFleet[0].temp);
+      iotHistory.tkr03.push(iotFleet[1].temp);
+      iotHistory.limit.push(4.5);
+      if (iotHistory.labels.length > 18) {
+        iotHistory.labels.shift(); iotHistory.tkr01.shift(); iotHistory.tkr03.shift(); iotHistory.limit.shift();
+      }
+      if (iotChart) iotChart.update();
+
+      const logEl = document.getElementById('iotAlertLog');
+      const hottest = [...iotFleet].sort((a, b) => b.temp - a.temp)[0];
+      const isAlert = hottest.temp > 4.5;
+      const entry = document.createElement('div');
+      entry.className = `p-2 rounded border ${isAlert ? 'bg-danger-lt border-danger text-danger' : 'bg-light text-dark'}`;
+      entry.textContent = `[${now}] ${hottest.id}: ${hottest.temp.toFixed(2)}°C (${hottest.door}) — ${isAlert ? 'ALERT >4.5°C' : 'Nominal'}`;
+      logEl.prepend(entry);
+      while (logEl.children.length > 20) logEl.removeChild(logEl.lastChild);
+    }
+
+    function toggleIoTStream() {
+      iotRunning = !iotRunning;
+      document.getElementById('iotToggleBtn').textContent = iotRunning ? 'Pause Stream' : 'Resume Stream';
+    }
+    function injectIoTBreach() {
+      breachInjected = true;
+      iotFleet[1].temp = 6.15;
+      iotFleet[1].door = 'OPEN';
+      stepIoT(true);
+    }
+    function resetIoTBreach() {
+      breachInjected = false;
+      iotFleet.forEach(t => { t.temp = t.baseTemp; t.door = 'CLOSED'; t.rpm = 2380; });
+      stepIoT(true);
+    }
+    function resetIoTStream() {
+      breachInjected = false;
+      iotRunning = true;
+      document.getElementById('iotToggleBtn').textContent = 'Pause Stream';
+      iotFleet.forEach(t => { t.temp = t.baseTemp; t.door = 'CLOSED'; t.rpm = 2380; });
+      iotHistory.labels.length = 0; iotHistory.tkr01.length = 0; iotHistory.tkr03.length = 0; iotHistory.limit.length = 0;
+      const logEl = document.getElementById('iotAlertLog');
+      if (logEl) logEl.innerHTML = '';
+      stepIoT(true);
+    }
+
+    const ROUTE_HUBS = [
+      { id: 'BMC-Anand-North', name: 'Anand North', vol: 5600, temp: 3.8, x: 450, y: 255 },
+      { id: 'BMC-Mehsana-East', name: 'Mehsana East', vol: 6400, temp: 4.9, x: 250, y: 115 },
+      { id: 'BMC-Banaskantha-West', name: 'Banaskantha West', vol: 7200, temp: 5.6, x: 130, y: 50 },
+      { id: 'BMC-Sabarkantha-Central', name: 'Sabarkantha Central', vol: 4900, temp: 3.4, x: 495, y: 90 },
+      { id: 'BMC-Kheda-South', name: 'Kheda South', vol: 4300, temp: 3.2, x: 390, y: 215 }
+    ];
+    const DEPOT_NODE = { id: 'DEPOT', name: 'Gandhinagar Plant', x: 325, y: 165 };
+    const DIST_TABLE = {
+      'DEPOT': { 'BMC-Anand-North': 95, 'BMC-Mehsana-East': 60, 'BMC-Banaskantha-West': 135, 'BMC-Sabarkantha-Central': 95, 'BMC-Kheda-South': 65 },
+      'BMC-Anand-North': { 'DEPOT': 95, 'BMC-Mehsana-East': 155, 'BMC-Banaskantha-West': 225, 'BMC-Sabarkantha-Central': 160, 'BMC-Kheda-South': 40 },
+      'BMC-Mehsana-East': { 'DEPOT': 60, 'BMC-Anand-North': 155, 'BMC-Banaskantha-West': 80, 'BMC-Sabarkantha-Central': 85, 'BMC-Kheda-South': 120 },
+      'BMC-Banaskantha-West': { 'DEPOT': 135, 'BMC-Anand-North': 225, 'BMC-Mehsana-East': 80, 'BMC-Sabarkantha-Central': 110, 'BMC-Kheda-South': 195 },
+      'BMC-Sabarkantha-Central': { 'DEPOT': 95, 'BMC-Anand-North': 160, 'BMC-Mehsana-East': 85, 'BMC-Banaskantha-West': 110, 'BMC-Kheda-South': 140 },
+      'BMC-Kheda-South': { 'DEPOT': 65, 'BMC-Anand-North': 40, 'BMC-Mehsana-East': 120, 'BMC-Banaskantha-West': 195, 'BMC-Sabarkantha-Central': 140 }
+    };
+
+    function renderRouteInputs() {
+      document.getElementById('routeInputsBody').innerHTML = ROUTE_HUBS.map((h, idx) => `
+        <tr>
+          <td class="fw-medium">${h.name}</td>
+          <td><input type="number" step="200" value="${h.vol}" onchange="ROUTE_HUBS[${idx}].vol = Number(this.value); solveSimpleRoutes();" class="form-control form-control-sm mono" style="width:82px;"></td>
+          <td><input type="number" step="0.1" value="${h.temp}" onchange="ROUTE_HUBS[${idx}].temp = Number(this.value); solveSimpleRoutes();" class="form-control form-control-sm mono" style="width:68px;"></td>
+        </tr>`).join('');
+    }
+
+    function solveSimpleRoutes() {
+      const cap = Number(document.getElementById('tankerCapSlider').value);
+      const warmFirst = document.getElementById('warmPriorityToggle').checked;
+      const alphaOrder = [...ROUTE_HUBS].sort((a, b) => a.id.localeCompare(b.id));
+      let baseKm = 0, idx = 0;
+      const basePaths = [];
+      while (idx < alphaOrder.length) {
+        let curr = 'DEPOT', load = 0, pts = [DEPOT_NODE];
+        while (idx < alphaOrder.length && load + alphaOrder[idx].vol <= cap) {
+          const nxt = alphaOrder[idx++]; baseKm += DIST_TABLE[curr][nxt.id]; load += nxt.vol; curr = nxt.id; pts.push(nxt);
+        }
+        if (curr === 'DEPOT') {
+          const nxt = alphaOrder[idx++]; baseKm += DIST_TABLE['DEPOT'][nxt.id]; curr = nxt.id; pts.push(nxt);
+        }
+        baseKm += DIST_TABLE[curr]['DEPOT']; pts.push(DEPOT_NODE); basePaths.push(pts);
+      }
+
+      let rem = ROUTE_HUBS.map(h => ({ ...h })), optKm = 0, truckNum = 1;
+      const smartTrucks = [], logLines = [];
+      while (rem.length > 0) {
+        let curr = 'DEPOT', load = 0, dist = 0, pts = [DEPOT_NODE];
+        logLines.push(`<div class="fw-bold bg-light px-2 py-1 rounded">Tanker TKR-0${truckNum} from Gandhinagar Depot (Cap: ${cap.toLocaleString()} L)</div>`);
+        while (rem.length > 0) {
+          const feasible = rem.filter(h => load + h.vol <= cap);
+          if (feasible.length === 0) break;
+          const urgent = warmFirst ? feasible.filter(h => h.temp > 4.5) : [];
+          const pool = urgent.length > 0 ? urgent : feasible;
+          pool.sort((a, b) => DIST_TABLE[curr][a.id] - DIST_TABLE[curr][b.id]);
+          const nxt = pool[0], leg = DIST_TABLE[curr][nxt.id];
+          const reason = (warmFirst && nxt.temp > 4.5)
+            ? `<span class="text-danger fw-semibold">Priority 01: Warm (${nxt.temp}°C &gt; 4.5°C)</span>`
+            : `<span class="text-primary fw-semibold">Priority 02: Nearest (${leg} km)</span>`;
+          dist += leg; load += nxt.vol; curr = nxt.id; pts.push(nxt); rem = rem.filter(h => h.id !== nxt.id);
+          logLines.push(`<div class="ps-3">&rarr; <strong>${nxt.name}</strong> (+${leg} km, +${nxt.vol.toLocaleString()} L) &mdash; ${reason}</div>`);
+        }
+        const ret = DIST_TABLE[curr]['DEPOT'];
+        dist += ret; optKm += dist; pts.push(DEPOT_NODE);
+        smartTrucks.push({ pts, dist, load });
+        logLines.push(`<div class="ps-3 text-success fw-semibold">&rarr; Return Gandhinagar (+${ret} km) | Run: ${dist} km | Load: ${load.toLocaleString()} L</div>`);
+        truckNum++;
+      }
+
+      const savedKm = Math.max(0, baseKm - optKm);
+      const pct = baseKm > 0 ? ((savedKm / baseKm) * 100).toFixed(1) : '0.0';
+      const fuel = (savedKm / 3.5).toFixed(1);
+      const co2 = (fuel * 2.68).toFixed(1);
+
+      document.getElementById('rtBaseKm').textContent = `${baseKm} km (${basePaths.length} trucks)`;
+      document.getElementById('rtOptKm').textContent = `${optKm} km (${smartTrucks.length} trucks)`;
+      document.getElementById('rtSavedKm').textContent = `${savedKm} km (-${pct}%)`;
+      document.getElementById('rtEcoSaved').textContent = `${fuel} L | ${co2} kg CO₂`;
+      document.getElementById('routeStepLog').innerHTML = logLines.join('');
+
+      const svg = document.getElementById('routeSvgMap');
+      let svgHtml = '';
+      for (let gx = 80; gx < 640; gx += 80) svgHtml += `<line x1="${gx}" y1="0" x2="${gx}" y2="330" stroke="#26323d" stroke-width="1" />`;
+      for (let gy = 65; gy < 330; gy += 65) svgHtml += `<line x1="0" y1="${gy}" x2="640" y2="${gy}" stroke="#26323d" stroke-width="1" />`;
+      basePaths.forEach(pts => {
+        svgHtml += `<path d="${pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')}" fill="none" stroke="#f76707" stroke-width="1.8" stroke-dasharray="5,5" opacity="0.7" />`;
+      });
+      const colors = ['#2fb344', '#f59f00', '#4dabf7'];
+      smartTrucks.forEach((tr, i) => {
+        svgHtml += `<path d="${tr.pts.map((p, k) => `${k === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+      });
+      svgHtml += `<rect x="${DEPOT_NODE.x - 8}" y="${DEPOT_NODE.y - 8}" width="16" height="16" rx="3" fill="#f59f00" stroke="#ffffff" stroke-width="2" />
+                  <text x="${DEPOT_NODE.x}" y="${DEPOT_NODE.y + 24}" text-anchor="middle" fill="#ffe8cc" font-size="11" font-weight="600">Gandhinagar Depot</text>`;
+      ROUTE_HUBS.forEach(h => {
+        const warm = h.temp > 4.5;
+        svgHtml += `<circle cx="${h.x}" cy="${h.y}" r="7" fill="${warm ? '#fa5252' : '#40c057'}" stroke="#182026" stroke-width="2" />
+                    <text x="${h.x}" y="${h.y - 12}" text-anchor="middle" fill="#f1f3f5" font-size="11" font-weight="500">${h.name} (${h.temp}°C)</text>`;
+      });
+      svg.innerHTML = svgHtml;
+    }
+
+    let scenarioChart = null;
+    const SCENARIOS = {
+      thermal_breach: { title: 'Drill 01: Reefer Compressor Failure (TKR-03 @ 6.4°C)', desc: 'Compressor efficiency drops on Mehsana corridor; chamber temperature rises +2.1°C.', mods: { tempDelta: 1.45, volMult: 1.0, demandMult: 1.0, savedKmMult: 1.12 }, before: [3.8, 18.2, 8500], after: [5.25, 39.4, 8500], directive: 'Control Directive: Flagged Mehsana & Banaskantha hubs as Urgent Priority-01 Stops; preserved 22,400 L.' },
+      summer_heatwave: { title: 'Drill 02: 43°C North Gujarat Summer Heatwave', desc: 'Extreme ambient heat (+9°C) while lean-season demand increases +22%.', mods: { tempDelta: 1.15, volMult: 0.88, demandMult: 1.22, savedKmMult: 1.08 }, before: [3.8, 18.2, 8500], after: [4.95, 34.0, 10370], directive: 'Control Directive: Activated pre-chilling boost at Anand & Kheda BMC collection centers.' },
+      highway_congestion: { title: 'Drill 03: NH-48 Freight Bottleneck (+1.6 hrs Delay)', desc: 'Heavy highway congestion delays Anand–Kheda corridor by 96 minutes.', mods: { tempDelta: 0.75, volMult: 1.0, demandMult: 1.04, savedKmMult: 1.18 }, before: [3.8, 18.2, 8500], after: [4.55, 26.8, 8840], directive: 'Control Directive: Re-sequenced Kheda South ahead of Anand North to save 42 km.' },
+      monsoon_flood: { title: 'Drill 04: Monsoon Feeder Road Detour (+38 km)', desc: 'Waterlogging forces rural detour across Sabarkantha; partial loads consolidated.', mods: { tempDelta: 0.35, volMult: 1.05, demandMult: 0.98, savedKmMult: 1.24 }, before: [3.8, 18.2, 8500], after: [4.15, 21.5, 8330], directive: 'Control Directive: Consolidated 3 partial tanker runs into 2 high-capacity runs (94% utilization).' },
+      winter_flush: { title: 'Drill 05: Winter Flush Milk Surge (+25%)', desc: 'Peak winter buffalo milk yield surges +25% across all 5 hubs.', mods: { tempDelta: -0.45, volMult: 1.25, demandMult: 1.08, savedKmMult: 1.15 }, before: [3.8, 18.2, 8500], after: [3.35, 11.4, 9180], directive: 'Control Directive: Deployed 3 standby 12,000 L tankers to Gandhinagar plant.' },
+      cascade_failure: { title: 'Drill 06: Multi-Hub Chiller Outage Stress Test', desc: 'Simultaneous Banaskantha chill outage + weekend retail demand spike (+28%).', mods: { tempDelta: 1.85, volMult: 0.92, demandMult: 1.28, savedKmMult: 1.22 }, before: [3.8, 18.2, 8500], after: [5.65, 44.8, 10880], directive: 'Control Directive: Emergency split-fleet dispatch activated within 28 minutes.' }
+    };
+
+    function renderScenarioChart(b, a) {
+      if (scenarioChart) scenarioChart.destroy();
+      scenarioChart = new Chart(document.getElementById('scenarioChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Avg Reefer Temp (°C)', 'Spoilage Risk (%)', 'Next-Day Demand (x100 L)'],
+          datasets: [
+            { label: 'Baseline Normal', data: [b[0], b[1], +(b[2] / 100).toFixed(1)], backgroundColor: '#adb5bd', borderRadius: 4 },
+            { label: 'Active Drill Impact', data: [a[0], a[1], +(a[2] / 100).toFixed(1)], backgroundColor: '#1b4332', borderRadius: 4 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', align: 'end' } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#eef1f5' } } } }
+      });
+    }
+
+    function runScenario(key) {
+      const s = SCENARIOS[key];
+      if (!s) return;
+      activeModifiers = { ...s.mods };
+      document.querySelectorAll('.scen-card').forEach(c => c.classList.remove('selected'));
+      const activeCard = document.getElementById(`scen-btn-${key}`);
+      if (activeCard) activeCard.classList.add('selected');
+      document.getElementById('scenarioBanner').classList.remove('d-none');
+      document.getElementById('scenarioBannerText').textContent = s.title;
+      document.getElementById('scenTitle').textContent = s.title;
+      document.getElementById('scenDesc').textContent = s.desc;
+      document.getElementById('scenDirective').textContent = s.directive;
+      document.getElementById('scenDeltas').innerHTML = `
+        <div class="d-flex justify-content-between py-1"><span>Avg Reefer Temp:</span><strong class="mono text-danger">${s.before[0]}°C &rarr; ${s.after[0]}°C</strong></div>
+        <div class="d-flex justify-content-between py-1"><span>Spoilage Risk Rate:</span><strong class="mono text-warning">${s.before[1]}% &rarr; ${s.after[1]}%</strong></div>
+        <div class="d-flex justify-content-between py-1"><span>Next-Day Demand:</span><strong class="mono text-primary">${s.before[2].toLocaleString()} L &rarr; ${s.after[2].toLocaleString()} L</strong></div>`;
+      renderScenarioChart(s.before, s.after);
+      refreshOverview();
+    }
+
+    function resetScenario() {
+      activeModifiers = { tempDelta: 0, volMult: 1, demandMult: 1, savedKmMult: 1 };
+      document.querySelectorAll('.scen-card').forEach(c => c.classList.remove('selected'));
+      resetIoTBreach();
+      document.getElementById('scenarioBanner').classList.add('d-none');
+      document.getElementById('scenTitle').textContent = 'Baseline Normal Operations';
+      document.getElementById('scenDesc').textContent = 'Choose any operational drill above to inspect KPI shifts and recommended control-room actions.';
+      document.getElementById('scenDeltas').innerHTML = '';
+      document.getElementById('scenDirective').textContent = 'Control Directive: All 5 BMC hubs operating within NDDB ≤4.5°C compliance.';
+      renderScenarioChart([3.8, 18.2, 8500], [3.8, 18.2, 8500]);
+      refreshOverview();
+    }
+
+    function runMLInference() {
+      const temp = Number(document.getElementById('mlTemp').value);
+      const hrs = Number(document.getElementById('mlHrs').value);
+      const exc = Number(document.getElementById('mlExc').value);
+      const vol = Number(document.getElementById('mlVol').value);
+      document.getElementById('mlTempLbl').textContent = `${temp.toFixed(1)}°C`;
+      document.getElementById('mlHrsLbl').textContent = `${hrs.toFixed(1)} hrs`;
+      document.getElementById('mlExcLbl').textContent = `${exc} mins`;
+      document.getElementById('mlVolLbl').textContent = `${vol.toLocaleString()} L`;
+
+      const tLoad = Math.max(0, temp - 3.8) * Math.pow(hrs, 1.15) + exc / 45;
+      const ph = Math.max(6.15, Math.min(6.82, 6.72 - 0.024 * tLoad));
+      const mbrt = Math.max(0.6, Math.min(6.4, 5.6 - 0.34 * tLoad));
+      const z = -1.2 + 1.45 * (temp - 4.4) + 0.85 * (hrs - 2.6) + 0.032 * (exc - 25);
+      const prob = 1 / (1 + Math.exp(-z));
+      document.getElementById('mlProbVal').textContent = `${(prob * 100).toFixed(1)}%`;
+      document.getElementById('mlChemVal').textContent = `Est. pH: ${ph.toFixed(2)} | MBRT: ${mbrt.toFixed(1)} hrs`;
+      document.getElementById('mlDemandVal').textContent = `${Math.round(vol * 1.24 + 1180).toLocaleString()} L`;
+
+      const badge = document.getElementById('mlRiskBadge');
+      if (prob >= 0.7) { badge.textContent = 'CRITICAL SPOILAGE RISK'; badge.className = 'badge bg-danger mono'; }
+      else if (prob >= 0.4) { badge.textContent = 'ELEVATED WARNING'; badge.className = 'badge bg-warning text-dark mono'; }
+      else { badge.textContent = 'SAFE COLD-CHAIN'; badge.className = 'badge bg-success mono'; }
+    }
+
+    function initMLFeatChart() {
+      new Chart(document.getElementById('mlFeatChart'), {
+        type: 'bar',
+        data: {
+          labels: ['MBRT Hours', 'Thermal Excursion (mins)', 'Milk pH Level', 'Reefer Temp (°C)', 'Transit Distance (km)', 'Transit Duration (hrs)', 'Door Open Count'],
+          datasets: [{ label: 'Feature Weight', data: [0.2845, 0.2458, 0.1966, 0.1150, 0.0542, 0.0540, 0.0160], backgroundColor: '#1b4332', borderRadius: 4 }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#eef1f5' } }, y: { grid: { display: false } } } }
+      });
+    }
+
+    let dbPage = 1, bsModal = null;
+    function getFilteredRecords() {
+      const q = document.getElementById('dbSearch').value.trim().toLowerCase();
+      const bmc = document.getElementById('dbBmcFilter').value;
+      const risk = document.getElementById('dbRiskFilter').value;
+      return dbRecords.filter(r =>
+        (!bmc || r.Collection_Center_BMC === bmc) &&
+        (risk === '' || String(r.Cold_Chain_Spoilage_Risk) === risk) &&
+        (!q || r.Batch_ID.toLowerCase().includes(q) || r.Tanker_ID.toLowerCase().includes(q) || r.Route_Corridor.toLowerCase().includes(q))
+      );
+    }
+
+    function renderDbTable() {
+      const filtered = getFilteredRecords();
+      const size = Number(document.getElementById('dbPageSize').value);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / size));
+      if (dbPage > totalPages) dbPage = totalPages;
+      const start = (dbPage - 1) * size;
+      const pageRows = filtered.slice(start, start + size);
+
+      document.getElementById('dbCountSubtitle').textContent = `Showing ${filtered.length.toLocaleString()} matching records (Total Ledger: ${dbRecords.length.toLocaleString()})`;
+      document.getElementById('dbPageInfo').textContent = `Page ${dbPage} of ${totalPages} (Rows ${start + 1}–${Math.min(start + size, filtered.length)})`;
+
+      document.getElementById('dbTableBody').innerHTML = pageRows.map(r => `
+        <tr>
+          <td class="fw-semibold mono">${r.Batch_ID}</td>
+          <td class="text-secondary mono">${r.Timestamp}</td>
+          <td>${r.Collection_Center_BMC}</td>
+          <td class="mono text-secondary">${r.Tanker_ID}</td>
+          <td class="mono">${r.Raw_Milk_Volume_Liters.toLocaleString()}</td>
+          <td class="mono fw-semibold ${r.Reefer_Chamber_Temp_C > 4.5 ? 'text-danger' : 'text-success'}">${r.Reefer_Chamber_Temp_C}°C</td>
+          <td class="mono text-secondary">${r.Milk_pH_Level} / ${r.MBRT_Hours}h</td>
+          <td class="mono text-primary">${r.Optimal_Route_Saved_Km}</td>
+          <td class="mono">${r.Next_Day_Demand_Liters.toLocaleString()} L</td>
+          <td><span class="badge ${r.Cold_Chain_Spoilage_Risk === 1 ? 'bg-danger-lt text-danger' : 'bg-success-lt text-success'} mono">${r.Cold_Chain_Spoilage_Risk === 1 ? 'AT RISK' : 'SAFE'}</span></td>
+        </tr>`).join('');
+    }
+
+    function changeDbPage(d) { dbPage = Math.max(1, dbPage + d); renderDbTable(); }
+    function exportCSV() {
+      const csv = Papa.unparse(dbRecords);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'dairy_supply_chain_dataset.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+    function openAddModal() {
+      const el = document.getElementById('addModal');
+      if (window.tabler && window.tabler.Modal) {
+        bsModal = window.tabler.Modal.getInstance(el) || new window.tabler.Modal(el);
+        bsModal.show();
+      } else {
+        el.classList.add('show'); el.style.display = 'block';
+      }
+    }
+    function closeAddModal() {
+      const el = document.getElementById('addModal');
+      if (bsModal) bsModal.hide();
+      else { el.classList.remove('show'); el.style.display = 'none'; }
+    }
+    function saveNewBatch() {
+      const bmc = document.getElementById('newBmc').value;
+      const tanker = document.getElementById('newTanker').value || 'TKR-01';
+      const vol = Number(document.getElementById('newVol').value) || 5500;
+      const temp = Number(document.getElementById('newTemp').value) || 3.4;
+      dbRecords.unshift({
+        Batch_ID: `BATCH-${10001 + dbRecords.length}`,
+        Timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        Collection_Center_BMC: bmc,
+        Route_Corridor: 'CORR-A1-Express',
+        Tanker_ID: tanker,
+        Day_Of_Week: new Date().getDay(),
+        Season_Index: 1,
+        Raw_Milk_Volume_Liters: vol,
+        Fat_Content_Pct: 4.5, SNF_Content_Pct: 8.65, Initial_Chilling_Temp_C: 3.1,
+        Reefer_Chamber_Temp_C: temp, Ambient_External_Temp_C: 31.0,
+        Transit_Distance_Km: 54.0, Transit_Duration_Hrs: 1.9,
+        Reefer_Door_Open_Count: 1, Thermal_Excursion_Mins: temp > 4.5 ? 25 : 0,
+        Milk_pH_Level: temp > 4.5 ? 6.48 : 6.68, MBRT_Hours: temp > 4.5 ? 2.3 : 5.1,
+        Optimal_Route_Saved_Km: 8.4, Cold_Chain_Spoilage_Risk: temp > 4.6 ? 1 : 0,
+        Next_Day_Demand_Liters: Math.round(vol * 1.25)
+      });
+      closeAddModal();
+      refreshOverview();
+      renderDbTable();
+    }
+
+    async function checkBackendPing() {
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 800);
+        const res = await fetch('http://localhost:8000/api/health', { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (res.ok) document.getElementById('connBadge').textContent = 'FastAPI Live Sync (:8000)';
+      } catch (_) {}
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      buildSeedDataset();
+      refreshOverview();
+      initIoTChart();
+      stepIoT();
+      setInterval(stepIoT, 2000);
+      renderRouteInputs();
+      solveSimpleRoutes();
+      renderScenarioChart([3.8, 18.2, 8500], [3.8, 18.2, 8500]);
+      initMLFeatChart();
+      runMLInference();
+      renderDbTable();
+      checkBackendPing();
+    });
+  </script>
+</body>
+</html>
